@@ -1,0 +1,136 @@
+#include <xinu.h>
+#include <stdio.h>
+#include <future.h>
+#include <queue_temp.h>
+
+syscall future_get(future *f, int *value)
+{
+	//get the value of a future set by an operation
+	intmask mask;
+	mask = disable();
+
+	if(f == NULL)
+	{	
+		restore(mask);
+		return SYSERR;
+	}
+	if(f->flag == FUTURE_EXCLUSIVE)
+	{
+		if(f->state == FUTURE_VALID)
+		{
+			*value = *f->value;
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_EMPTY)
+		{
+			f->state = FUTURE_WAITING;
+			f->tid = currpid;
+			suspend(f->tid);
+
+			if(f->state == FUTURE_VALID)
+				*value = *f->value;
+			
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_WAITING)
+		{
+			restore(mask);
+			return SYSERR;
+		}
+	}
+	else if(f->flag == FUTURE_SHARED)
+	{
+		if(f->state == FUTURE_VALID)
+		{
+			*value = *f->value;
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_EMPTY)
+		{
+			f->state = FUTURE_WAITING;
+			f->tid = currpid;
+			//printf("process %d\n", f->tid);
+			//enquque cons 
+			enqueue_temp(f->tid, &(f->get_queue));	
+			suspend(f->tid);
+
+			if(f->state == FUTURE_VALID)
+				*value = *f->value;	
+
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_WAITING)
+		{
+			f->tid = currpid;
+			//printf("process %d\n", f->tid);
+
+			//enquque cons 
+			enqueue_temp(f->tid, &(f->get_queue));	
+			suspend(f->tid);
+
+			if(f->state == FUTURE_VALID)
+				*value = *f->value;	
+
+			restore(mask);
+			return OK;
+		}
+	}
+	else if(f->flag == FUTURE_QUEUE)
+	{
+		if(f->state == FUTURE_VALID)
+		{
+			*value = *f->value;
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_EMPTY)
+		{
+			f->state = FUTURE_WAITING;
+			
+			if((f->set_queue).front == NULL)
+			{
+				f->tid = currpid;
+				//enqueue cons 
+				enqueue_temp(f->tid, &(f->get_queue));	
+				suspend(f->tid);
+			}
+			else
+			{
+				resume(dequeue_temp(&(f->set_queue)));
+			}
+
+			if(f->state == FUTURE_VALID)
+			{
+				//printf("*f->value in get: %d\n", *(f->value));
+				*value = *f->value;
+				f->state = FUTURE_EMPTY;
+			}	
+
+			restore(mask);
+			return OK;
+		}
+		else if(f->state == FUTURE_WAITING)
+		{
+			f->tid = currpid;
+			//enqueue cons 
+			enqueue_temp(f->tid, &(f->get_queue));	
+			suspend(f->tid);
+
+			if(f->state == FUTURE_VALID)
+			{	
+				*value = *f->value;
+				f->state = FUTURE_EMPTY;
+			}
+			
+			restore(mask);
+			return OK;
+		}
+	}
+
+	restore(mask);
+	return SYSERR;
+}

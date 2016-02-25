@@ -1,0 +1,76 @@
+/* clkhandler.c - clkhandler */
+
+#include <xinu.h>
+
+/*-----------------------------------------------------------------------
+ * clkhandler - high level clock interrupt handler
+ *-----------------------------------------------------------------------
+ */
+void	clkhandler()
+{
+	struct	arpentry *arptr;		/* variable to access arpcache */
+	static uint32 arpcount1000 = 1000;	/* variable to count 1000ms for arpcache */
+
+	static uint32 count1000 = 1000;	/* variable to count 1000ms */
+	volatile struct am335x_timer1ms *csrptr = 0x44E31000;
+					/* Pointer to timer CSR	    */
+
+	/* Checks arpcache entry time */
+	int i;
+	arpcount1000--;
+	if(arpcount1000 == 0)
+	{
+		for (i = 0; i < ARP_SIZ; i++) {
+			arptr = &arpcache[i];
+			if(arptr->arclk >= 300) {
+				arptr->arstate = AR_FREE;
+				arptr->arclk = 0;
+			}
+			else
+				arptr->arclk++;
+		}
+		arpcount1000 = 1000;
+	}
+
+	/* If there is no interrupt, return */
+
+	if((csrptr->tisr & AM335X_TIMER1MS_TISR_OVF_IT_FLAG) == 0) {
+		return;
+	}
+
+	/* Acknowledge the interrupt */
+
+	csrptr->tisr = AM335X_TIMER1MS_TISR_OVF_IT_FLAG;
+
+	/* Decrement 1000ms counter */
+
+	count1000--;
+
+	/* After 1 sec, increment clktime */
+
+	if(count1000 == 0) {
+		clktime++;
+		count1000 = 1000;
+	}
+
+	/* check if sleep queue is empty */
+
+	if(!isempty(sleepq)) {
+
+		/* sleepq nonempty, decrement the key of */
+		/* topmost process on sleepq		 */
+
+		if((--queuetab[firstid(sleepq)].qkey) == 0) {
+
+			wakeup();
+		}
+	}
+
+	/* Decrement the preemption counter */
+	/* Reschedule if necessary	    */
+
+	if((--preempt) == 0) {
+		preempt = QUANTUM;
+		resched();
+	}
+}

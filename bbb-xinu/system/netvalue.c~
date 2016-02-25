@@ -1,0 +1,61 @@
+#include <xinu.h>
+#include <queue_temp.h>
+#include <future.h>
+#include <stdlib.h>
+
+int netvalue()
+{
+	//int returnval = -1;
+	int returnval;
+	uint32 remoteip;
+	dot2ip("192.168.1.100",&remoteip);	/* remote IP address to use	*/
+	int	i;				/* index into buffer		*/
+	int	retval;				/* return value			*/
+	char	msg[20] = "Xinu waiting for value from Linux"; /* message to send	*/
+	char	inbuf[1500];			/* buffer for incoming reply	*/
+	int32	slot;				/* UDP slot to use		*/
+	int32	msglen;				/* length of outgoing message	*/
+	uint16	echoport= 8888;			/* port number for UDP echo	*/
+	uint16	locport	= 52743;		/* local port to use		*/
+	int32	retries	= 6;			/* number of retries		*/
+	int32	delay	= 2000;			/* reception delay in ms	*/
+	
+	/* register local UDP port */
+	slot = udp_register(remoteip, echoport, locport);
+	if (slot == SYSERR) {
+		printf("could not reserve UDP port \n");
+		return 1;
+	}
+
+	/* Retry sending outgoing datagram and getting response */
+	msglen = strnlen(msg, 1200);
+	for (i=0; i<retries; i++) {
+		retval = udp_send(slot, msg, msglen+50);
+		if (retval == SYSERR) {
+			printf("error sending UDP \n");
+			return 1;
+		}
+
+		retval = udp_recv(slot, inbuf, sizeof(inbuf), delay);
+		if (retval == TIMEOUT) {
+			printf("timeout...\n");
+			continue;
+		} else if (retval == SYSERR) {
+			printf("error from udp_recv \n");
+			udp_release(slot);
+			return 1;
+		}
+		break;
+	}
+
+	udp_release(slot);
+	if (retval == TIMEOUT) {
+		printf("retry limit exceeded\n");
+		return SYSERR;
+	}
+
+	returnval = atoi(inbuf);
+	//printf("UDP echo test was successful\n");
+	printf("Received value is %d\n", returnval);
+	return returnval;
+}
