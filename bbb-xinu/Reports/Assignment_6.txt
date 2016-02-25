@@ -1,0 +1,32 @@
+﻿ Assignment 6 
+
+9.1 Write a function that walks the list of free memory blocks and prints a line with the address
+and length of each block.
+ -> We have implemented a shell command named 'memwalk' which displays the address & length of each free memory block.
+
+9.4 Replace the low-level memory management functions with a set of functions that allocate
+heap and stack memory permanently (i.e., without providing a mechanism to return storage
+to a free list). How do the sizes of the new allocation routines compare to the sizes of
+getstk and getmem?
+ -> We have implemented a shell command 'lowmem' which takes 1 argument '-s' i.e. 'lowmem -s', which allocates memory to a 'test process', runs it and then kills the process without freeing the stack and heap. 
+The new allocation routines differ from getstk and/or getmem in the below two points:
+1) While allocating stack for the process, we have implemented first fit with memory partitioning incase the size requested is less than the block size found, whereas, getstk implements 'last fit'. So, in our case, the stack is allocated from the lowest available block. This does not follow the XINU convention of stack growing downward from the highest address & heap growing upward from the lowest address. Stack & heap could be interspersed here.
+2) In case we free our stack and/or heap in our implementation, it will create holes in the free memory.
+
+9.7 Many embedded systems go through a prototype stage, in which the system is built on a
+general platform, and a final stage, in which minimal hardware is designed for the system.
+In terms of memory management, one question concerns the size of the stack needed by
+each process. Modify the code to allow the system to measure the maximum stack space
+used by a process and report the maximum stack size when the process exits.
+ -> We have implemented a shell command 'lowmem' which takes 1 argument '-m' i.e. 'lowmem -m', which allocates memory to a 'test process', runs it and then kills the process without freeing the stack and heap.
+To calculate the stack used by the process, we have initialized it with a value before resuming the process. When the process exits, we check for this value in the stack, summation of number of locations where it doesn't exists gives us the stack used by the process.
+
+Files created for this Assignment:
+shell -> xsh_lowmem.c
+shell -> xsh_memwalk.c
+include -> lowmem.h
+system -> allocatestack.c
+system -> createmod.c
+system -> killmod.c
+apps -> testprocess.c
+
