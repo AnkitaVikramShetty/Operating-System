@@ -1,0 +1,10 @@
+#include <prodcons.h>
+
+int net_future_prod(future *fut) 
+{
+	int j;
+	j=0;
+	j = netvalue();
+	future_set(fut, &j);
+	return OK;
+}
